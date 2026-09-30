@@ -5,7 +5,7 @@ coverage:
   exclude:
     - "test/**"
     - "node_modules/**"
-  acceptable: patch >= 70%
+  acceptable: patch >= 70% && current >= 87.1%
   if: true
 codeToTestRatio:
   code:
