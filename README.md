@@ -2,7 +2,12 @@
 
 the shared core every clauth-compatible proxy builds on, so every proxy looks the same to clauth and only its proxy↔provider code varies.
 
-![license](https://shields.uwuclxdy.dev/badge/license-MIT%20OR%20Apache--2.0-blue)
+<p align="center">
+  <img src="https://cov.uwuclxdy.dev/badges/uwuclxdy/clauth-proxy-core/coverage.svg" alt="coverage" />
+  <img src="https://cov.uwuclxdy.dev/badges/uwuclxdy/clauth-proxy-core/ratio.svg" alt="code to test ratio" />
+  <img src="https://cov.uwuclxdy.dev/badges/uwuclxdy/clauth-proxy-core/time.svg" alt="test execution time" />
+  <a href="#license"><img src="https://shields.uwuclxdy.dev/badge/license-MIT%20OR%20Apache--2.0-blue" alt="MIT OR Apache-2.0 license" /></a>
+</p>
 
 ## What it is
 
