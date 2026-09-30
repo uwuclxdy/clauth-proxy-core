@@ -1,0 +1,35 @@
+repository: uwuclxdy/clauth-proxy-core
+coverage:
+  paths:
+    - lcov.info
+  exclude:
+    - "test/**"
+    - "node_modules/**"
+  acceptable: patch >= 70%
+  if: true
+codeToTestRatio:
+  code:
+    - "src/**/*.ts"
+  test:
+    - "test/**/*.ts"
+  if: true
+testExecutionTime:
+  steps:
+    - test
+  if: true
+comment:
+  if: is_pull_request && !github.event.pull_request.head.repo.fork
+  updatePrevious: true
+  expandDetails: true
+  hideFooterLink: true
+  hideCoverageLink: true
+summary:
+  if: true
+report:
+  if: is_default_branch
+  datastores:
+    - github://uwuclxdy/clauth-proxy-core@coverage/reports
+diff:
+  if: is_pull_request
+  datastores:
+    - github://uwuclxdy/clauth-proxy-core@coverage/reports
