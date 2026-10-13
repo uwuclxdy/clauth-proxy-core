@@ -452,6 +452,48 @@ describe("usage", () => {
     expect(body.accounts[0]!.figures).toEqual([]);
   }, 15000);
 
+  test("an offer figure reaches /usage with its items intact", async () => {
+    const s = ts({
+      figuresData: [
+        {
+          kind: "offer",
+          id: "trial-plans",
+          label: "trial plans",
+          read_at: "2026-10-13T12:00:00Z",
+          items: [
+            {
+              id: "wk-c8",
+              label: "Weekend trial",
+              state: "claimed",
+              grants: [{ label: "Token grant", amount: 500, unit: "tokens" }],
+              starts_at: "2026-10-13T11:00:00Z",
+              ends_at: "2026-10-14T11:00:00Z",
+            },
+          ],
+        },
+      ],
+    });
+    const { id } = await loginNewAccount(s);
+    await s.server.usage.pollOne(s.store.get(id)!);
+    const res = await s.app.request("/clauth/v1/usage", { headers: adminHeaders() });
+    expect(res.status).toBe(200);
+    const body = (await json(res)) as {
+      accounts: { figures: { id: string; items: unknown[] }[] }[];
+    };
+    const figure = body.accounts[0]!.figures.find((f) => f.id === "trial-plans");
+    expect(figure).toBeDefined();
+    expect(figure!.items).toEqual([
+      {
+        id: "wk-c8",
+        label: "Weekend trial",
+        state: "claimed",
+        grants: [{ label: "Token grant", amount: 500, unit: "tokens" }],
+        starts_at: "2026-10-13T11:00:00Z",
+        ends_at: "2026-10-14T11:00:00Z",
+      },
+    ]);
+  }, 15000);
+
   test("a failed read keeps the last good figures with a stale_reason", async () => {
     const s = ts();
     const { id } = await loginNewAccount(s);
