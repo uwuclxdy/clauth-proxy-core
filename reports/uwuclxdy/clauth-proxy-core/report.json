@@ -1,13 +1,13 @@
 {
   "repository": "uwuclxdy/clauth-proxy-core",
   "ref": "refs/heads/mommy",
-  "commit": "7ebf919249abfe935e01d5367b150d9745550246",
+  "commit": "ec45b74e07fa25d39b4ccc56b1206335effd69e5",
   "base_ref": "refs/heads/mommy",
   "coverage": {
     "type": "loc",
     "format": "LCOV",
-    "total": 1833,
-    "covered": 1633,
+    "total": 1834,
+    "covered": 1636,
     "files": [
       {
         "type": "loc",
@@ -3847,8 +3847,8 @@
         "type": "loc",
         "file": "src/schemas.ts",
         "normalized_path": "src/schemas.ts",
-        "total": 322,
-        "covered": 310,
+        "total": 323,
+        "covered": 313,
         "blocks": [
           {
             "type": "loc",
@@ -5191,15 +5191,15 @@
             "type": "loc",
             "start_line": 219,
             "end_line": 219,
-            "count": 0,
-            "count_u64": 0
+            "count": 28,
+            "count_u64": 28
           },
           {
             "type": "loc",
             "start_line": 220,
             "end_line": 220,
-            "count": 0,
-            "count_u64": 0
+            "count": 54,
+            "count_u64": 54
           },
           {
             "type": "loc",
@@ -5235,6 +5235,13 @@
             "end_line": 225,
             "count": 0,
             "count_u64": 0
+          },
+          {
+            "type": "loc",
+            "start_line": 226,
+            "end_line": 226,
+            "count": 1,
+            "count_u64": 1
           },
           {
             "type": "loc",
@@ -11464,8 +11471,8 @@
             "type": "loc",
             "start_line": 107,
             "end_line": 107,
-            "count": 116,
-            "count_u64": 116
+            "count": 102,
+            "count_u64": 102
           },
           {
             "type": "loc",
@@ -12961,7 +12968,7 @@
   },
   "code_to_test_ratio": {
     "code": 1929,
-    "test": 2322,
+    "test": 2363,
     "code_files": [
       {
         "code": 56,
@@ -13085,9 +13092,9 @@
         "language": "TypeScript"
       },
       {
-        "code": 1523,
+        "code": 1564,
         "comment": 21,
-        "blank": 115,
+        "blank": 116,
         "path": "test/server.test.ts",
         "language": "TypeScript"
       },
@@ -13115,5 +13122,5 @@
     ]
   },
   "test_execution_time": 86000000000,
-  "timestamp": "2026-09-30T06:49:46.953571103Z"
+  "timestamp": "2026-10-13T14:09:39.501826707Z"
 }
