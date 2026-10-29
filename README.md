@@ -27,7 +27,7 @@ The adapter owns only its manifest fields and the upstream calls: starting, poll
 
 ## Who uses it
 
-A maintainer building a `clauth-<service>-proxy`: fork or write one adapter, and the core supplies the whole surface clauth talks to. The full wire contract lives in [`skills/clauth-proxy-contract/SKILL.md`](skills/clauth-proxy-contract/SKILL.md).
+A maintainer building a `clauth-<service>-proxy`: fork or write one adapter, and the core supplies the whole surface clauth talks to. The full wire contract lives in [`.agents/skills/clauth-proxy-contract/SKILL.md`](.agents/skills/clauth-proxy-contract/SKILL.md).
 
 ## Install
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { SHAPES } from "../src/index.ts";
 import { adminHeaders, cleanupTestDirs, makeTestServer, waitFor } from "./helpers.ts";
 
-const SKILL_PATH = join(import.meta.dir, "..", "skills", "clauth-proxy-contract", "SKILL.md");
+const SKILL_PATH = join(import.meta.dir, "..", ".agents", "skills", "clauth-proxy-contract", "SKILL.md");
 
 function cells(line: string): string[] {
   return line
