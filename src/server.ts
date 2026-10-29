@@ -294,7 +294,7 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
   }, publishAccount);
   const usage = new UsageCache(adapter, manifest, store, (account: UsageAccount) => {
     events.publish("usage", account);
-  }, publishAccount);
+  }, publishAccount, configValues);
 
   const app = new Hono();
 
@@ -491,6 +491,7 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
           account: toAdapterView(account),
           action: name,
           target,
+          config: configValues(),
         });
       } catch (err) {
         if (err instanceof AdapterError && (err.reason === "login_required" || err.reason === "suspended")) {
@@ -586,6 +587,7 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
         account: toAdapterView(account),
         request: rebuildForwardRequest(c.req.raw, bodyText),
         route,
+        config: configValues(),
       });
       return await normalizeInferenceResponse(res);
     } catch (err) {

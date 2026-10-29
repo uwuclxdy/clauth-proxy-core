@@ -110,11 +110,21 @@ export interface ForwardContext {
   request: Request;
   /** `"messages"` or `"count_tokens"`. */
   route: "messages" | "count_tokens";
+  /**
+   * The proxy-scope declared settings with defaults merged, read fresh at every
+   * call so a `PATCH /clauth/v1/config` takes effect on the next request.
+   */
+  config: Record<string, unknown>;
 }
 
 export interface ReadFiguresContext {
   accountId: string;
   account: AccountView;
+  /**
+   * The proxy-scope declared settings with defaults merged, read fresh at every
+   * call so a `PATCH /clauth/v1/config` takes effect on the next request.
+   */
+  config: Record<string, unknown>;
 }
 
 export interface RunActionContext {
@@ -122,6 +132,11 @@ export interface RunActionContext {
   account: AccountView;
   action: string;
   target: string | null;
+  /**
+   * The proxy-scope declared settings with defaults merged, read fresh at every
+   * call so a `PATCH /clauth/v1/config` takes effect on the next request.
+   */
+  config: Record<string, unknown>;
 }
 
 export interface DropLoginContext {

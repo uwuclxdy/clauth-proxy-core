@@ -661,6 +661,78 @@ describe("settings and config", () => {
   });
 });
 
+describe("adapter config contexts", () => {
+  test("forward carries the current proxy config on every request, no restart", async () => {
+    const s = ts();
+    const { key } = await loginNewAccount(s);
+
+    await s.app.request("/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key },
+      body: JSON.stringify({ model: "x" }),
+    });
+    expect(s.calls.forward[0]!.config.host_identity).toBe(false);
+
+    const patch = await s.app.request("/clauth/v1/config", {
+      method: "PATCH",
+      headers: adminHeaders(),
+      body: JSON.stringify({ values: { host_identity: true } }),
+    });
+    expect(patch.status).toBe(200);
+
+    await s.app.request("/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key },
+      body: JSON.stringify({ model: "x" }),
+    });
+    expect(s.calls.forward[1]!.config.host_identity).toBe(true);
+  }, 15000);
+
+  test("a usage poll carries the current proxy config, no restart", async () => {
+    const s = ts();
+    const { id } = await loginNewAccount(s);
+
+    await s.server.usage.pollOne(s.store.get(id)!);
+    expect(s.calls.readFigures[0]!.config.host_identity).toBe(false);
+
+    await s.app.request("/clauth/v1/config", {
+      method: "PATCH",
+      headers: adminHeaders(),
+      body: JSON.stringify({ values: { host_identity: true } }),
+    });
+
+    await s.server.usage.pollOne(s.store.get(id)!);
+    expect(s.calls.readFigures[1]!.config.host_identity).toBe(true);
+  }, 15000);
+
+  test("an action carries the current proxy config, no restart", async () => {
+    const s = ts();
+    const { id } = await loginNewAccount(s);
+
+    await s.app.request(`/clauth/v1/accounts/${id}/actions/claim-now`, {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ target: "x" }),
+    });
+    expect(s.calls.runAction).toHaveLength(1);
+    expect(s.calls.runAction[0]!.config.host_identity).toBe(false);
+
+    await s.app.request("/clauth/v1/config", {
+      method: "PATCH",
+      headers: adminHeaders(),
+      body: JSON.stringify({ values: { host_identity: true } }),
+    });
+
+    await s.app.request(`/clauth/v1/accounts/${id}/actions/claim-now`, {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ target: "x" }),
+    });
+    expect(s.calls.runAction).toHaveLength(2);
+    expect(s.calls.runAction[1]!.config.host_identity).toBe(true);
+  }, 15000);
+});
+
 describe("keys and accounts", () => {
   test("re-minting a key invalidates the old one at once", async () => {
     const s = ts();
@@ -706,7 +778,9 @@ describe("actions", () => {
     });
     expect(res.status).toBe(202);
     expect(await json(res)).toEqual({ accepted: true });
-    expect(s.calls.runAction).toEqual([{ accountId: id, action: "claim-now", target: "weekend-glm" }]);
+    expect(s.calls.runAction).toEqual([
+      { accountId: id, action: "claim-now", target: "weekend-glm", config: { host_identity: false } },
+    ]);
   }, 15000);
 });
 

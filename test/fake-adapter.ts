@@ -91,8 +91,8 @@ export const DEFAULT_ACTIONS: DeclaredAction[] = [
 
 export interface FakeAdapterCalls {
   forward: ForwardContext[];
-  readFigures: string[];
-  runAction: { accountId: string; action: string; target: string | null }[];
+  readFigures: { accountId: string; config: Record<string, unknown> }[];
+  runAction: { accountId: string; action: string; target: string | null; config: Record<string, unknown> }[];
   dropLogin: DropLoginContext[];
   loginStart: (string | null)[];
   loginCancel: string[];
@@ -189,7 +189,7 @@ export function makeFakeAdapter(opts: FakeAdapterOptions = {}): {
     },
 
     async readFigures(ctx) {
-      calls.readFigures.push(ctx.accountId);
+      calls.readFigures.push({ accountId: ctx.accountId, config: ctx.config });
       if (readState.figuresError !== undefined) throw readState.figuresError;
       return readState.figuresData ?? [
         {
@@ -219,7 +219,7 @@ export function makeFakeAdapter(opts: FakeAdapterOptions = {}): {
     },
 
     async runAction(ctx) {
-      calls.runAction.push({ accountId: ctx.accountId, action: ctx.action, target: ctx.target });
+      calls.runAction.push({ accountId: ctx.accountId, action: ctx.action, target: ctx.target, config: ctx.config });
     },
 
     async dropLogin(ctx) {

@@ -88,6 +88,7 @@ export class UsageCache {
     private readonly store: AccountStore,
     private readonly onUsage: (account: UsageAccount) => void,
     private readonly onAccount: (account: ReturnType<typeof toPublic>) => void,
+    private readonly getConfig: () => Record<string, unknown>,
     private readonly nowMs: () => number = nowEpochMs,
   ) {}
 
@@ -121,6 +122,7 @@ export class UsageCache {
       const raw = await this.adapter.readFigures({
         accountId: account.id,
         account: toAdapterView(account),
+        config: this.getConfig(),
       });
       // a read that finished after the account was deleted caches nothing and
       // publishes nothing for the dead account
