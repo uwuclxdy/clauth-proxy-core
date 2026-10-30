@@ -17,6 +17,7 @@ export type LoginFailedCode =
   | "denied"
   | "code_invalid"
   | "identity_mismatch"
+  | "duplicate_identity"
   | "resolve_failed"
   | "upstream_unavailable"
   | "internal";

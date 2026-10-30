@@ -126,6 +126,14 @@ export class AccountStore {
     return null;
   }
 
+  /** Look an account up by its upstream identity. O(n) over the few accounts a proxy holds. */
+  findByIdentity(identity: UpstreamIdentity): StoredAccount | null {
+    for (const account of this.list()) {
+      if (account.identity === identity) return account;
+    }
+    return null;
+  }
+
   create(data: {
     label: string;
     state: AccountState;

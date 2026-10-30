@@ -230,7 +230,7 @@ export class FlowManager {
       // established; a done flow owns it, and the record's state outlives its
       // removal (GC, shutdown), so a collected done flow still owns it.
       if (res.state === "done" && state !== "done") {
-        await this.dropLateLogin(res);
+        await this.dropUnclaimedLogin(res);
       }
       if (current === undefined) {
         return { ok: false, error: "not_found", status: 404 };
@@ -317,7 +317,7 @@ export class FlowManager {
       const state = flow.state as FlowRecord["state"];
       if (current !== flow || state !== "pending") {
         if (res.state === "done" && state !== "done") {
-          await this.dropLateLogin(res);
+          await this.dropUnclaimedLogin(res);
         }
         return;
       }
@@ -354,6 +354,18 @@ export class FlowManager {
     }
     // done
     if (flow.accountId === null) {
+      // the lookup and the create below must stay one synchronous stretch: an
+      // await between them would let a concurrent bare login of the same
+      // identity pass the lookup before this create lands
+      const held = this.store.findByIdentity(res.identity);
+      if (held !== null) {
+        flow.state = "failed";
+        flow.error = "duplicate_identity";
+        flow.finishedAt = this.nowMs();
+        this.onLogin(flowStatusJson(flow));
+        await this.dropUnclaimedLogin(res);
+        return;
+      }
       const key = mintInferenceKey();
       const account = this.store.create({
         label: res.label,
@@ -435,12 +447,12 @@ export class FlowManager {
     this.onLogin(flowStatusJson(flow));
   }
 
-  /** Drop a login that arrived after its flow was cancelled, so no upstream session leaks. */
-  private async dropLateLogin(res: LoginDoneResult): Promise<void> {
+  /** Drop a done login no account will own — a late done after its flow ended, or a duplicate-identity refusal — so no upstream session leaks. */
+  private async dropUnclaimedLogin(res: LoginDoneResult): Promise<void> {
     try {
       await this.adapter.dropLogin({ accountId: null, account: null, upstream: res.blob });
     } catch (err) {
-      log.error(`login flow: dropLogin of a late done failed (${errorClass(err)})`);
+      log.error(`login flow: dropLogin of an unclaimed done failed (${errorClass(err)})`);
     }
   }
 

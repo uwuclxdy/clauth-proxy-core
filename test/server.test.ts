@@ -215,6 +215,41 @@ describe("accounts and login", () => {
     expect(failed.error).toBe("identity_mismatch");
   }, 15000);
 
+  test("a bare login of an identity the store already holds fails duplicate_identity and writes nothing", async () => {
+    const s = ts();
+    const first = await loginNewAccount(s);
+    expect(s.store.list()).toHaveLength(1);
+
+    // the same upstream user signs in again, naming no account
+    const res = await s.app.request("/clauth/v1/accounts/login", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: "{}",
+    });
+    expect(res.status).toBe(201);
+    const start = (await res.json()) as { flow: string };
+    await waitFor(async () => {
+      const r = await s.app.request(`/clauth/v1/accounts/login/${start.flow}`, { headers: adminHeaders() });
+      return ((await r.json()) as { state: string }).state === "failed";
+    });
+    const failed = (await (
+      await s.app.request(`/clauth/v1/accounts/login/${start.flow}`, { headers: adminHeaders() })
+    ).json()) as { state: string; error: string; inference_key?: string };
+    expect(failed.error).toBe("duplicate_identity");
+    expect(failed.inference_key).toBeUndefined();
+
+    // nothing written: the held account is still the only one, and the login
+    // this flow established upstream was dropped rather than leaked
+    expect(s.store.list().map((a) => a.id)).toEqual([first.id]);
+    expect(s.calls.dropLogin).toHaveLength(1);
+
+    // a different upstream user still completes
+    s.loginState.identity = "u-fresh";
+    const fresh = await loginNewAccount(s);
+    expect(fresh.id).not.toBe(first.id);
+    expect(s.store.list()).toHaveLength(2);
+  }, 15000);
+
   test("an unknown account id on re-bind is 404", async () => {
     const s = ts();
     const res = await s.app.request("/clauth/v1/accounts/login", {
@@ -1171,6 +1206,41 @@ describe("login races", () => {
     } finally {
       (process.stderr as unknown as { write: typeof original }).write = original;
     }
+  }, 15000);
+
+  test("two concurrent bare logins of one identity mint one account and the second fails duplicate_identity", async () => {
+    const s = ts();
+    const gates: Array<() => void> = [];
+    let polls = 0;
+    s.adapter.loginPoll = async () => {
+      polls++;
+      await new Promise<void>((r) => gates.push(r));
+      return { state: "done" as const, identity: "u-1", label: "kitty@example.com", plans: [], blob: { upstream: "credential" } };
+    };
+    const start = async (): Promise<string> => {
+      const res = await s.app.request("/clauth/v1/accounts/login", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: "{}",
+      });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { flow: string }).flow;
+    };
+    const first = await start();
+    const second = await start();
+    await waitFor(() => polls === 2); // both polls are held in flight
+    gates.forEach((g) => g());
+    const status = async (flow: string): Promise<{ state: string; error?: string }> =>
+      (await (await s.app.request(`/clauth/v1/accounts/login/${flow}`, { headers: adminHeaders() })).json()) as {
+        state: string;
+        error?: string;
+      };
+    await waitFor(async () => (await status(second)).state !== "pending");
+    expect((await status(second)).state).toBe("failed");
+    expect((await status(second)).error).toBe("duplicate_identity");
+    expect((await status(first)).state).toBe("done");
+    expect(s.store.list()).toHaveLength(1);
+    expect(s.calls.dropLogin).toEqual([{ accountId: null, account: null, upstream: { upstream: "credential" } }]);
   }, 15000);
 });
 
