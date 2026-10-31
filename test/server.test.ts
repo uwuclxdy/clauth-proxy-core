@@ -44,6 +44,31 @@ async function loginNewAccount(s: ReturnType<typeof makeTestServer>): Promise<{ 
   return { id: done!.account.id, key: done!.inference_key };
 }
 
+interface LoginStatusBody {
+  state: string;
+  error?: string;
+  inference_key?: string;
+  account?: { id: string; label: string; plans: { id: string; label: string }[] };
+}
+
+/** Start a bare login and poll it until it leaves `pending`. */
+async function bareLogin(s: ReturnType<typeof makeTestServer>): Promise<LoginStatusBody> {
+  const res = await s.app.request("/clauth/v1/accounts/login", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({}),
+  });
+  expect(res.status).toBe(201);
+  const start = (await res.json()) as { flow: string };
+  let body: LoginStatusBody | undefined;
+  await waitFor(async () => {
+    const r = await s.app.request(`/clauth/v1/accounts/login/${start.flow}`, { headers: adminHeaders() });
+    body = (await r.json()) as LoginStatusBody;
+    return body.state !== "pending";
+  });
+  return body!;
+}
+
 describe("bind", () => {
   test("parseBind accepts loopback hosts and refuses a non-loopback one, naming it", () => {
     expect(parseBind("127.0.0.1:8080")).toEqual({ hostname: "127.0.0.1", port: 8080 });
@@ -215,35 +240,45 @@ describe("accounts and login", () => {
     expect(failed.error).toBe("identity_mismatch");
   }, 15000);
 
-  test("a bare login of an identity the store already holds fails duplicate_identity and writes nothing", async () => {
+  test("a bare login of an identity the store already holds re-binds that account in place", async () => {
     const s = ts();
     const first = await loginNewAccount(s);
     expect(s.store.list()).toHaveLength(1);
+    expect(s.store.get(first.id)!.login_gen ?? 0).toBe(0);
 
-    // the same upstream user signs in again, naming no account
-    const res = await s.app.request("/clauth/v1/accounts/login", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: "{}",
+    // a suspended entry comes back ready, under whatever label the new sign-in
+    // reports, and the network hears about it
+    await s.store.patch(first.id, (current) => {
+      current.state = "suspended";
     });
-    expect(res.status).toBe(201);
-    const start = (await res.json()) as { flow: string };
-    await waitFor(async () => {
-      const r = await s.app.request(`/clauth/v1/accounts/login/${start.flow}`, { headers: adminHeaders() });
-      return ((await r.json()) as { state: string }).state === "failed";
+    const accountEvents: Record<string, unknown>[] = [];
+    s.server.events.subscribe((name, data) => {
+      if (name === "account") accountEvents.push(data as Record<string, unknown>);
     });
-    const failed = (await (
-      await s.app.request(`/clauth/v1/accounts/login/${start.flow}`, { headers: adminHeaders() })
-    ).json()) as { state: string; error: string; inference_key?: string };
-    expect(failed.error).toBe("duplicate_identity");
-    expect(failed.inference_key).toBeUndefined();
 
-    // nothing written: the held account is still the only one, and the login
-    // this flow established upstream was dropped rather than leaked
-    expect(s.store.list().map((a) => a.id)).toEqual([first.id]);
-    expect(s.calls.dropLogin).toHaveLength(1);
+    // the same upstream user signs in again, naming no account: the login lands
+    // on the account that identity already belongs to
+    s.loginState.blob = { upstream: "credential-2" };
+    s.loginState.label = "kitty-2@example.com";
+    s.loginState.plans = [{ id: "start-plan", label: "start plan" }];
+    const again = await bareLogin(s);
+    expect(again.state).toBe("done");
+    expect(again.account?.id).toBe(first.id);
+    expect(again.account?.label).toBe("kitty-2@example.com");
+    expect(again.inference_key).toBeUndefined();
 
-    // a different upstream user still completes
+    expect(s.store.list()).toHaveLength(1);
+    const stored = s.store.get(first.id)!;
+    expect(stored.login_gen).toBe(1);
+    expect(stored.state).toBe("ready");
+    expect(stored.label).toBe("kitty-2@example.com");
+    expect(stored.blob).toEqual({ upstream: "credential-2" });
+    expect(stored.plans).toEqual([{ id: "start-plan", label: "start plan" }]);
+    expect(accountEvents.some((e) => e.id === first.id)).toBe(true);
+    // the login this flow established IS the account's new one, so nothing drops
+    expect(s.calls.dropLogin).toHaveLength(0);
+
+    // a different upstream user still completes as its own account
     s.loginState.identity = "u-fresh";
     const fresh = await loginNewAccount(s);
     expect(fresh.id).not.toBe(first.id);
@@ -1208,7 +1243,7 @@ describe("login races", () => {
     }
   }, 15000);
 
-  test("two concurrent bare logins of one identity mint one account and the second fails duplicate_identity", async () => {
+  test("two concurrent bare logins of one identity leave exactly one account, the second a re-bind", async () => {
     const s = ts();
     const gates: Array<() => void> = [];
     let polls = 0;
@@ -1236,11 +1271,11 @@ describe("login races", () => {
         error?: string;
       };
     await waitFor(async () => (await status(second)).state !== "pending");
-    expect((await status(second)).state).toBe("failed");
-    expect((await status(second)).error).toBe("duplicate_identity");
+    expect((await status(second)).state).toBe("done");
     expect((await status(first)).state).toBe("done");
     expect(s.store.list()).toHaveLength(1);
-    expect(s.calls.dropLogin).toEqual([{ accountId: null, account: null, upstream: { upstream: "credential" } }]);
+    expect(s.store.list()[0]!.login_gen).toBe(1);
+    expect(s.calls.dropLogin).toEqual([]);
   }, 15000);
 });
 

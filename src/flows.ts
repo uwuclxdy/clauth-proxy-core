@@ -356,32 +356,41 @@ export class FlowManager {
     if (flow.accountId === null) {
       // the lookup and the create below must stay one synchronous stretch: an
       // await between them would let a concurrent bare login of the same
-      // identity pass the lookup before this create lands
+      // identity pass the lookup before this create lands. A held identity
+      // re-binds that account in place; its patch may await once the decision
+      // is made (the store serializes patches per account).
       const held = this.store.findByIdentity(res.identity);
       if (held !== null) {
-        flow.state = "failed";
-        flow.error = "duplicate_identity";
+        // patch cannot return null: the lookup and the patch's re-read share one tick, and store writes are atomic renames
+        const stored = (await this.store.patch(held.id, (current) => {
+          current.label = res.label;
+          current.blob = res.blob;
+          current.plans = res.plans;
+          current.state = "ready";
+          current.login_gen = (current.login_gen ?? 0) + 1;
+        }))!;
+        flow.state = "done";
+        flow.account = toPublic(stored);
         flow.finishedAt = this.nowMs();
-        this.onLogin(flowStatusJson(flow));
-        await this.dropUnclaimedLogin(res);
-        return;
+        this.onAccount(toPublic(stored));
+      } else {
+        const key = mintInferenceKey();
+        const account = this.store.create({
+          label: res.label,
+          state: "ready",
+          identity: res.identity,
+          blob: res.blob,
+          plans: res.plans,
+          settings: defaultSettings(this.manifest.settings, "account"),
+          created_at: nowIso(),
+          key,
+        });
+        flow.state = "done";
+        flow.account = toPublic(account);
+        flow.inferenceKey = key;
+        flow.finishedAt = this.nowMs();
+        this.onAccount(toPublic(account));
       }
-      const key = mintInferenceKey();
-      const account = this.store.create({
-        label: res.label,
-        state: "ready",
-        identity: res.identity,
-        blob: res.blob,
-        plans: res.plans,
-        settings: defaultSettings(this.manifest.settings, "account"),
-        created_at: nowIso(),
-        key,
-      });
-      flow.state = "done";
-      flow.account = toPublic(account);
-      flow.inferenceKey = key;
-      flow.finishedAt = this.nowMs();
-      this.onAccount(toPublic(account));
     } else {
       let stored;
       try {
@@ -447,7 +456,7 @@ export class FlowManager {
     this.onLogin(flowStatusJson(flow));
   }
 
-  /** Drop a done login no account will own — a late done after its flow ended, or a duplicate-identity refusal — so no upstream session leaks. */
+  /** Drop a done login no account will own — a late done after its flow ended — so no upstream session leaks. */
   private async dropUnclaimedLogin(res: LoginDoneResult): Promise<void> {
     try {
       await this.adapter.dropLogin({ accountId: null, account: null, upstream: res.blob });
