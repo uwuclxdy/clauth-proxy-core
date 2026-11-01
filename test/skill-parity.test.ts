@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SHAPES } from "../src/index.ts";
+import { CONTRACT_VERSION, SHAPES } from "../src/index.ts";
 import { adminHeaders, cleanupTestDirs, makeTestServer, waitFor } from "./helpers.ts";
 
 const SKILL_PATH = join(import.meta.dir, "..", ".agents", "skills", "clauth-proxy-contract", "SKILL.md");
@@ -81,6 +81,15 @@ function requiredFields(lines: string[]): Map<string, Set<string>> {
     out.set(name, set);
   }
   return out;
+}
+
+/** The highest `MAJOR.MINOR` a passage names in backticks, or undefined when it names none. */
+function latestMinor(text: string): string | undefined {
+  const rank = (v: string) => v.split(".").reduce((acc, n) => acc * 1000 + Number(n), 0);
+  return [...text.matchAll(/`(\d+)\.(\d+)`/g)]
+    .map((m) => `${m[1]}.${m[2]}`)
+    .sort((a, b) => rank(a) - rank(b))
+    .at(-1);
 }
 
 function topLevelFields(obj: unknown): Set<string> {
@@ -214,5 +223,10 @@ describe("contract skill parity", () => {
       expect(md).toContain(`\`${event}\``);
     }
     expect(md).toContain("## SSE events");
+  });
+
+  test("the newest minor the skill names is the contract the core serves", () => {
+    const md = readFileSync(SKILL_PATH, "utf8");
+    expect(latestMinor(sections(md).get("Versioning and capabilities")!.join("\n"))).toBe(CONTRACT_VERSION);
   });
 });

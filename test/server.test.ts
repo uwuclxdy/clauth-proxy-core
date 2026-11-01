@@ -85,7 +85,7 @@ describe("manifest", () => {
       service: "zcode",
       display_name: "ZCode (z.ai)",
       version: "0.1.0",
-      contract: "1.0",
+      contract: CONTRACT_VERSION,
       capabilities: ["events"],
       drain_secs: 30,
     });

@@ -1,5 +1,5 @@
 /** The contract this core serves. The major matches the `/clauth/v1` path. */
-export const CONTRACT_VERSION = "1.0";
+export const CONTRACT_VERSION = "1.1";
 export const CONTRACT_MAJOR = "1";
 
 /** Ids (`account`, `flow`, figure `id`, action `name`, setting `key`) sit in a path segment without percent-encoding. */
