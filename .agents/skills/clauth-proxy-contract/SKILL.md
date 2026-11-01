@@ -388,6 +388,8 @@ Units are a closed set: `percent`, `tokens`, `requests`, `currency`, `custom` (w
 
 `contract` is `"MAJOR.MINOR"`. The major matches the `/clauth/v1` path, and a clauth refuses a foreign major. A minor only adds optional fields, figure kinds, units, account states, error codes, capabilities, and capability-gated routes. A clauth speaking 1.N works with any proxy on 1.M; `clauth proxy check` requires the field set of the minor the proxy declares.
 
+Minors, in order: `1.0` is the base; `1.1` adds `model` on a figure declaration (optional).
+
 ## Settings form
 
 Settings use clauth's own small form, one TUI row grammar per type: `bool` is a toggle, `enum` a cycle row, `int`/`number` with `step` a stepper, `int`/`number` without `step` and `string` a typed field. `label` is at most 14 chars for account scope and 17 for proxy scope. Every field declares `key`, `scope`, `label`, `hint`, `type` and `default`; an enum needs at least one option, and a non-null default must match the type (a `null` default marks the setting nullable). There is no secret type: a value readable over `GET` is never a credential. A field with `active_when` exists only while its key's value is in `in[]`; writing it while inactive answers 422 `invalid_setting`. `null` in a patch resets a key to its default.
