@@ -65,6 +65,7 @@ export const FigureDeclarationSchema = z.object({
   kind: FigureKindSchema,
   label: z.string(),
   chain: ChainRoleSchema.optional(),
+  model: z.string().min(1).optional(),
 });
 
 export const ManifestSchema = z.object({

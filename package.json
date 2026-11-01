@@ -1,6 +1,6 @@
 {
   "name": "clauth-proxy-core",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "the shared core every clauth-compatible proxy builds on, so every proxy looks the same to clauth and only its proxy<->provider code varies",
   "license": "MIT OR Apache-2.0",
   "type": "module",

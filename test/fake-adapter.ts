@@ -37,7 +37,7 @@ export interface FakeAdapterOptions {
 export const DEFAULT_FIGURES: FigureDeclaration[] = [
   { id: "coding-plan-5h", kind: "window", label: "coding plan 5h", chain: "5h" },
   { id: "coding-plan-7d", kind: "window", label: "coding plan 7d", chain: "7d" },
-  { id: "start-plan", kind: "balance", label: "start plan" },
+  { id: "start-plan", kind: "balance", label: "start plan", model: "glm-5.3" },
   { id: "off-peak", kind: "channel", label: "off-peak" },
   { id: "trial-plans", kind: "offer", label: "trial plans" },
   { id: "traffic", kind: "stats", label: "traffic" },

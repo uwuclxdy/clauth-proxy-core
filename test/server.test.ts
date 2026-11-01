@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { AdapterError, CONTRACT_VERSION, hashKey, manifestJson, parseBind, validateFigure, validateManifest } from "../src/index.ts";
+import { AdapterError, CONTRACT_VERSION, hashKey, manifestJson, parseBind, validateFigure, validateManifest, type FigureDeclaration } from "../src/index.ts";
 import { makeFakeAdapter } from "./fake-adapter.ts";
 import { adminHeaders, cleanupTestDirs, makeTestServer, waitFor } from "./helpers.ts";
 
@@ -126,6 +126,15 @@ describe("health and info", () => {
     expect(Array.isArray(body.actions)).toBe(true);
     expect(Array.isArray(body.figures)).toBe(true);
     expect(Array.isArray(body.settings)).toBe(true);
+    const figures = body.figures as FigureDeclaration[];
+    expect(figures.find((figure) => figure.id === "start-plan")).toEqual({
+      id: "start-plan",
+      kind: "balance",
+      label: "start plan",
+      model: "glm-5.3",
+    });
+    // a declaration that names no model keeps none: the field stays optional
+    expect(figures.find((figure) => figure.id === "off-peak")).not.toHaveProperty("model");
   });
 
   test("a wrong admin token is refused 401", async () => {
@@ -1646,6 +1655,15 @@ describe("body caps", () => {
 });
 
 describe("settings manifest and reset", () => {
+  test("a figure whose model is empty is refused at manifest time", () => {
+    expect(() =>
+      validateManifest({
+        ...makeFakeAdapter().adapter.manifest,
+        figures: [{ id: "empty-model", kind: "balance", label: "empty model", model: "" }],
+      }),
+    ).toThrow(/model/);
+  });
+
   test("a setting without a hint is refused at manifest time", () => {
     expect(() =>
       validateManifest({

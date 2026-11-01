@@ -88,6 +88,7 @@ Auth `Bearer` means `Authorization: Bearer <admin token>`, compared constant-tim
 | kind | figure kind | yes | `window`, `balance`, `channel`, `offer` or `stats` |
 | label | string | yes | the bar or row label |
 | chain | `"5h"` \| `"7d"` | no | window only, one figure per role per account |
+| model | string | no | the model whose quota the figure counts; a renderer treats balance figures naming the same model as one pool |
 
 ### setting-field
 
@@ -410,7 +411,7 @@ interface ProxyAdapter {
     version: string;
     capabilities: string[];
     drain_secs?: number;      // 0..3600
-    figures: FigureDeclaration[];   // {id, kind, label, chain?}
+    figures: FigureDeclaration[];   // {id, kind, label, chain?, model?}
     settings: SettingField[];       // the form above
     actions: DeclaredAction[];      // {name, label, scope, target?, confirm}
     usage_cadence_ms: number;       // how often the core polls figures
