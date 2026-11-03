@@ -21,6 +21,7 @@ The core owns:
 - the usage cache: polling each account at an adapter-declared cadence, keeping the last good figure with its old `read_at` and a `stale_reason` on a failed read
 - settings validation against the declared form, `/config` for proxy scope and `PATCH /accounts/{id}` for account scope
 - `POST /v1/messages` forwarding with streaming passthrough and Anthropic's error envelope
+- token stats, for an adapter that declares `token_stats`: each successful response's id, output tokens, time to first token and span, read off the forwarded stream and served at `GET /clauth/v1/tokens`
 - the lifecycle: a `manifest`/`serve` CLI, SIGTERM draining open streams before exit
 
 The adapter owns only its manifest fields and the upstream calls: starting, polling, pasting and cancelling a login; forwarding one inference request; reading one account's figures; running one declared action; dropping an account's upstream login on delete.

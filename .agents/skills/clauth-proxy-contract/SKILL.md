@@ -1,6 +1,6 @@
 ---
 name: clauth-proxy-contract
-description: the wire contract every clauth-compatible proxy serves on top of clauth-proxy-core — routes, field shapes, error envelopes, settings, figure kinds and the adapter API — plus the wire-parity workflow a proxy ships with.
+description: the wire contract every clauth-compatible proxy serves on top of clauth-proxy-core — routes, field shapes, error envelopes, settings, figure kinds, token stats and the adapter API — plus the wire-parity workflow a proxy ships with.
 ---
 
 # clauth proxy contract v1
@@ -9,7 +9,7 @@ The contract a `clauth-*-proxy` process serves to clauth. `clauth-proxy-core` im
 
 The control prefix is `/clauth/v1`; the contract major is `1`. A `clauth proxy check` run compares a live proxy against the field set of the minor its manifest declares, and against this document.
 
-Conventions: JSON bodies, UTF-8. Timestamps are RFC 3339 in UTC (a `Z` or `+00:00` suffix both parse). Readers ignore unknown fields; a minor version only adds. Ids (`account`, `flow`, figure `id`, action `name`, setting `key`) match `[a-z0-9][a-z0-9._-]{0,63}`. No `Access-Control-Allow-*` header is ever set. Every human-readable field is written by the proxy, never copied from upstream bytes.
+Conventions: JSON bodies, UTF-8. Timestamps are RFC 3339 in UTC (a `Z` or `+00:00` suffix both parse). Readers ignore unknown fields; a minor version only adds. Ids (`account`, `flow`, figure `id`, action `name`, setting `key`) match `[a-z0-9][a-z0-9._-]{0,63}`. No `Access-Control-Allow-*` header is ever set. Every human-readable field is written by the proxy, never copied from upstream bytes; a token record's `id` and `model` are the exception, copied from the response the client received.
 
 ## Routes
 
@@ -30,10 +30,11 @@ Conventions: JSON bodies, UTF-8. Timestamps are RFC 3339 in UTC (a `Z` or `+00:0
 | GET | /clauth/v1/config | Bearer | — | config-get | 200 |
 | PATCH | /clauth/v1/config | Bearer | config-patch-request | config-patch | 200 |
 | GET | /clauth/v1/events | Bearer | — | SSE | 200 |
+| GET | /clauth/v1/tokens | Bearer | — | token-records | 200 |
 | POST | /v1/messages | key | — | inference | passthrough |
 | POST | /v1/messages/count_tokens | key | — | inference | passthrough |
 
-Auth `Bearer` means `Authorization: Bearer <admin token>`, compared constant-time; a missing or wrong token answers 401 with `WWW-Authenticate: Bearer`. Auth `key` means the inference key from `x-api-key` or `Authorization: Bearer`; when both headers are present they must be equal. `GET /clauth/v1/events` exists only with the `events` capability, `POST /v1/messages/count_tokens` only with `count_tokens`; an undeclared optional route answers 501 `unsupported` (control) or 404 `not_found_error` (inference). A cancelled login flow (`DELETE /clauth/v1/accounts/login/{flow}`) reads back 404 `not_found`, like an unknown one.
+Auth `Bearer` means `Authorization: Bearer <admin token>`, compared constant-time; a missing or wrong token answers 401 with `WWW-Authenticate: Bearer`. Auth `key` means the inference key from `x-api-key` or `Authorization: Bearer`; when both headers are present they must be equal. `GET /clauth/v1/events` exists only with the `events` capability, `GET /clauth/v1/tokens` only with `token_stats`, `POST /v1/messages/count_tokens` only with `count_tokens`; an undeclared optional route answers 501 `unsupported` (control) or 404 `not_found_error` (inference). A cancelled login flow (`DELETE /clauth/v1/accounts/login/{flow}`) reads back 404 `not_found`, like an unknown one.
 
 ## Field tables
 
@@ -46,7 +47,7 @@ Auth `Bearer` means `Authorization: Bearer <admin token>`, compared constant-tim
 | description | string | no | one line of row detail |
 | version | semver | yes | the proxy's own version |
 | contract | `"MAJOR.MINOR"` | yes | the contract this proxy serves |
-| capabilities | string[] | yes | `events`, `count_tokens`; unknown entries are ignored |
+| capabilities | string[] | yes | `events`, `count_tokens`, `token_stats`; unknown entries are ignored |
 | drain_secs | int 0..3600 | no | how long SIGTERM may take to drain open streams |
 
 ### health
@@ -282,6 +283,26 @@ Auth `Bearer` means `Authorization: Bearer <admin token>`, compared constant-tim
 | cache_read | int | yes | cache-read tokens |
 | cache_creation | int | yes | cache-creation tokens |
 
+### token-records
+
+| field | type | req | meaning |
+|---|---|---|---|
+| records | token-record[] | yes | the retained records newer than `since`, every retained one when `since` is absent or unknown; oldest first, in completion order |
+| cursor | string, opaque | yes | names the newest record; the next read's `since` |
+| dropped | bool | no | present only as `true`, when `since` was unknown: records may be missing |
+
+### token-record
+
+| field | type | req | meaning |
+|---|---|---|---|
+| id | string 1..256 | yes | the client-visible `message.id`, the id the client writes to its own transcript; the dedupe key |
+| account | id | yes | the serving account |
+| model | string 1..256 | no | the model the response named |
+| output_tokens | int ≥ 0 | yes | the final output count: the last `message_delta` usage, or a JSON response's `usage` |
+| started_at | RFC 3339 | yes | when the proxy received the request |
+| ended_at | RFC 3339 | yes | when the proxy passed `message_stop` through; for a non-streamed JSON response, when its body completed |
+| ttft_ms | int ≥ 0 | no | request receipt to the first `content_block_delta`; absent on a non-streamed response or a stream with no `content_block_delta` |
+
 ### config-get
 
 | field | type | req | meaning |
@@ -386,9 +407,9 @@ Units are a closed set: `percent`, `tokens`, `requests`, `currency`, `custom` (w
 
 ## Versioning and capabilities
 
-`contract` is `"MAJOR.MINOR"`. The major matches the `/clauth/v1` path, and a clauth refuses a foreign major. A minor only adds optional fields, figure kinds, units, account states, error codes, capabilities, and capability-gated routes. A clauth speaking 1.N works with any proxy on 1.M; `clauth proxy check` requires the field set of the minor the proxy declares.
+`contract` is `"MAJOR.MINOR"`. The major matches the `/clauth/v1` path, and a clauth refuses a foreign major. A minor only adds optional fields, figure kinds, units, account states, error codes, capabilities, capability-gated routes, and SSE events. A clauth speaking 1.N works with any proxy on 1.M; `clauth proxy check` requires the field set of the minor the proxy declares.
 
-Minors, in order: `1.0` is the base; `1.1` adds `model` on a figure declaration (optional).
+Minors, in order: `1.0` is the base; `1.1` adds `model` on a figure declaration (optional); `1.2` adds the `token_stats` capability, `GET /clauth/v1/tokens` and the `token` event.
 
 ## Settings form
 
@@ -396,13 +417,29 @@ Settings use clauth's own small form, one TUI row grammar per type: `bool` is a 
 
 ## SSE events
 
-`GET /clauth/v1/events` streams `event:` names `account`, `usage`, `login` and `account_deleted`; each `data:` is the same JSON object the matching GET returns. A comment line is sent at open and then every 15 s to keep the stream alive. `account` carries the account object, `usage` the usage-account object, `login` the login-status object (never an `inference_key`), and `account_deleted` carries `{"id": <id>}` — never an `account` event for a deletion.
+`GET /clauth/v1/events` streams `event:` names `account`, `usage`, `login`, `account_deleted` and `token`; each `data:` is the same JSON object the matching GET returns, except `account_deleted` and `token`. A comment line is sent at open and then every 15 s to keep the stream alive. `account` carries the account object, `usage` the usage-account object, `login` the login-status object (never an `inference_key`), and `account_deleted` carries `{"id": <id>}` — never an `account` event for a deletion. `token` is sent only when the manifest declares both `token_stats` and `events`, once per landed record, and carries `{"cursor": "<cursor>"}`, the cursor `GET /clauth/v1/tokens` now returns: a wake-up only, never the record.
+
+## Token stats
+
+With the `token_stats` capability the core measures every 2xx `POST /v1/messages` response it forwards, after the adapter: the record holds what the client saw, so a translating adapter's minted id is still the client's id. `count_tokens` and non-2xx responses never make a record. Measuring reads a copy: the forwarded bytes pass unchanged and in order, and a body the core cannot parse makes no record.
+
+- The content type is matched case-insensitively: `text/event-stream` is a stream, `application/json` a non-streamed response, anything else makes no record.
+- A streamed response makes a record at `message_stop`, only when its `message_start` carried an id and a `message_delta` after it carried `usage.output_tokens`; a stream cancelled or ended before `message_stop`, or with no `message_delta` usage, makes none.
+- SSE lines end at CRLF, LF or a lone CR. The first `message_start` carrying a `message` object wins; a later one is ignored, and a `message_delta` before it does not count.
+- A non-streamed response makes a record when its body completes, only when it carries a top-level `id` and `usage.output_tokens`.
+- An unterminated SSE line over 1 Mi characters, one event's accumulated `data:` over 1 Mi characters, or a JSON body over 4 MiB stops the measurement: the bytes still pass, and no record is made.
+- `since` absent -> every retained record; a known cursor -> the records after it; an unknown one (never served, from a previous proxy life, or older than the ring) -> every retained record with `dropped: true`.
+- A cursor stays known until a record after it is evicted; the cursor served before any record lands is known too. Readers treat it as opaque.
+- The route keeps no per-consumer state, so several readers can poll it.
+- The core retains the newest 1024 records, in memory only; a restart loses unread records.
+- Speed and rate arithmetic belong to the reader, never the proxy.
+- An adapter declares `token_stats` only when its stream's `message_start` id and `message_delta` usage are real; without it the reader keeps its own figures for that proxy.
 
 ## Adapter API
 
 The core exports `defineProxy(adapter)` and `runCli`. A proxy's binary is `runCli(defineProxy(adapter))`; `manifest` prints the manifest JSON and touches no network or state, `serve` reads the env contract (`CLAUTH_PROXY_BIND` loopback-only, `CLAUTH_PROXY_STATE_DIR`, `CLAUTH_PROXY_ADMIN_TOKEN_FILE`) and serves until SIGTERM drains it.
 
-The adapter is the provider-specific half; it owns only its manifest fields and the upstream calls. The core owns the HTTP surface, routing, the admin-token check, request caps, both error envelopes, the account store (hash-only keys, re-mint, re-bind, delete), the login flow state machine, the usage cache and polling cadence, settings validation, `/v1/messages` forwarding, the SSE `events` stream, and the lifecycle.
+The adapter is the provider-specific half; it owns only its manifest fields and the upstream calls. The core owns the HTTP surface, routing, the admin-token check, request caps, both error envelopes, the account store (hash-only keys, re-mint, re-bind, delete), the login flow state machine, the usage cache and polling cadence, settings validation, `/v1/messages` forwarding, the token-stats measurement and its ring, the SSE `events` stream, and the lifecycle.
 
 ```ts
 interface ProxyAdapter {
