@@ -38,4 +38,5 @@ export type {
   DeclaredAction,
 } from "./types.ts";
 export { SHAPES } from "./schemas.ts";
+export type { TokenRecord, TokenRecords } from "./schemas.ts";
 export * as schemas from "./schemas.ts";

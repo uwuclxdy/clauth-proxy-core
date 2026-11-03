@@ -293,6 +293,27 @@ export const UsageSchema = z.object({
   accounts: z.array(UsageAccountSchema),
 });
 
+// ---- token records ----
+
+export const TokenRecordSchema = z.object({
+  id: z.string().min(1).max(256),
+  account: IdSchema,
+  model: z.string().min(1).max(256).optional(),
+  output_tokens: z.number().int().min(0),
+  started_at: TimestampSchema,
+  ended_at: TimestampSchema,
+  ttft_ms: z.number().int().min(0).optional(),
+});
+
+export const TokenRecordsSchema = z.object({
+  records: z.array(TokenRecordSchema),
+  cursor: z.string().min(1),
+  dropped: z.boolean().optional(),
+});
+
+export type TokenRecord = z.infer<typeof TokenRecordSchema>;
+export type TokenRecords = z.infer<typeof TokenRecordsSchema>;
+
 // ---- config ----
 
 export const ConfigGetSchema = z.object({
@@ -364,6 +385,8 @@ export const SHAPES: Record<string, z.ZodObject<Record<string, z.ZodType>>> = {
   "login-status": LoginStatusSchema,
   usage: UsageSchema,
   "usage-account": UsageAccountSchema,
+  "token-record": TokenRecordSchema,
+  "token-records": TokenRecordsSchema,
   "figure-envelope": FigureEnvelopeSchema,
   "figure-window": WindowKindSchema,
   "figure-balance": BalanceKindSchema,

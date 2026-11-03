@@ -102,7 +102,7 @@ describe("contract skill parity", () => {
     const md = readFileSync(SKILL_PATH, "utf8");
     const skillRoutes = routeSet(sections(md).get("Routes")!);
 
-    const s = makeTestServer({ capabilities: ["events", "count_tokens"] });
+    const s = makeTestServer({ capabilities: ["events", "count_tokens", "token_stats"] });
     const routerRoutes = new Set<string>();
     for (const route of s.app.routes as Array<{ method: string; path: string } | [string, string, unknown]>) {
       const method = Array.isArray(route) ? route[0] : route.method;
@@ -145,7 +145,13 @@ describe("contract skill parity", () => {
     const fields = fieldTables(sections(md).get("Field tables")!);
     const required = requiredFields(sections(md).get("Field tables")!);
 
-    const s = makeTestServer({ capabilities: ["events", "count_tokens"] });
+    const s = makeTestServer({
+      capabilities: ["events", "count_tokens", "token_stats"],
+      forward: () =>
+        new Response(JSON.stringify({ id: "msg_parity", model: "glm-5.3", usage: { output_tokens: 3 } }), {
+          headers: { "content-type": "application/json" },
+        }),
+    });
 
     // login once for an account + key, capturing the key on the first done read
     const loginRes = await s.app.request("/clauth/v1/accounts/login", {
@@ -174,9 +180,10 @@ describe("contract skill parity", () => {
     served["accounts"] = topLevelFields(await (await s.app.request("/clauth/v1/accounts", { headers: adminHeaders() })).json());
     served["login-start"] = topLevelFields(loginBody);
     served["login-status"] = topLevelFields(done);
-    served["key"] = topLevelFields(
-      await (await s.app.request(`/clauth/v1/accounts/${id}/key`, { method: "POST", headers: adminHeaders() })).json(),
-    );
+    const reminted = (await (
+      await s.app.request(`/clauth/v1/accounts/${id}/key`, { method: "POST", headers: adminHeaders() })
+    ).json()) as { inference_key: string };
+    served["key"] = topLevelFields(reminted);
     served["action-accepted"] = topLevelFields(
       await (
         await s.app.request(`/clauth/v1/accounts/${id}/actions/claim-now`, {
@@ -203,6 +210,15 @@ describe("contract skill parity", () => {
     served["inference-error"] = topLevelFields(
       await (await s.app.request("/v1/messages", { method: "POST", body: JSON.stringify({}) })).json(),
     );
+    await (
+      await s.app.request("/v1/messages", { method: "POST", headers: { "x-api-key": reminted.inference_key }, body: "{}" })
+    ).text();
+    const tokenRecords = (await (await s.app.request("/clauth/v1/tokens", { headers: adminHeaders() })).json()) as {
+      records: unknown[];
+    };
+    expect(tokenRecords.records).toHaveLength(1);
+    served["token-records"] = topLevelFields(tokenRecords);
+    served["token-record"] = topLevelFields(tokenRecords.records[0]);
 
     for (const [name, servedSet] of Object.entries(served)) {
       const skillSet = fields.get(name);
@@ -219,7 +235,7 @@ describe("contract skill parity", () => {
 
   test("the skill names the SSE events the core publishes", () => {
     const md = readFileSync(SKILL_PATH, "utf8");
-    for (const event of ["account", "usage", "login", "account_deleted"]) {
+    for (const event of ["account", "usage", "login", "account_deleted", "token"]) {
       expect(md).toContain(`\`${event}\``);
     }
     expect(md).toContain("## SSE events");

@@ -39,6 +39,7 @@ export interface FullManifest {
   /** The capability-gated optional routes the proxy serves. */
   hasEvents: boolean;
   hasCountTokens: boolean;
+  hasTokenStats: boolean;
 }
 
 export function validateManifest(adapter: AdapterManifest): FullManifest {
@@ -112,6 +113,7 @@ export function validateManifest(adapter: AdapterManifest): FullManifest {
     usage_cadence_ms: parsed.usage_cadence_ms,
     hasEvents: parsed.capabilities.includes("events"),
     hasCountTokens: parsed.capabilities.includes("count_tokens"),
+    hasTokenStats: parsed.capabilities.includes("token_stats"),
   };
 }
 

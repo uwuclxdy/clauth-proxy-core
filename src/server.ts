@@ -13,19 +13,27 @@ import {
   LoginRequestSchema,
   PasteRequestSchema,
   SettingsPatchRequestSchema,
+  type TokenRecord,
 } from "./schemas.ts";
 import { defaultSettings, validateSettings, type SettingsResult } from "./settings.ts";
 import { AccountStore, toAdapterView, toPublic, type AccountPublic } from "./store.ts";
+import { TokenStats, tapTokenStats } from "./tokens.ts";
 import { AdapterError, type ProxyAdapter } from "./types.ts";
 import { UsageCache, type UsageAccount } from "./usage.ts";
 
-export type EventName = "account" | "usage" | "login" | "account_deleted";
+export type EventName = "account" | "usage" | "login" | "account_deleted" | "token";
 
 export class EventBus {
   private listeners = new Set<(name: EventName, data: unknown) => void>();
 
   publish(name: EventName, data: unknown): void {
-    for (const listener of this.listeners) listener(name, data);
+    for (const listener of this.listeners) {
+      try {
+        listener(name, data);
+      } catch (err) {
+        log.error(`event ${name}: listener failed (${errorClass(err)})`);
+      }
+    }
   }
 
   subscribe(listener: (name: EventName, data: unknown) => void): () => void {
@@ -280,8 +288,14 @@ function matchesPath(path: string, pattern: string): boolean {
 export function buildServer(deps: BuildServerDeps): BuiltServer {
   const { adapter, manifest, store, adminToken, stateDir } = deps;
   const events = new EventBus();
+  const tokenStats = new TokenStats();
   const sseControllers = new Set<ReadableStreamDefaultController<Uint8Array>>();
   const inFlightActions = new Set<string>();
+
+  const pushToken = (record: TokenRecord): void => {
+    const cursor = tokenStats.push(record);
+    if (manifest.hasEvents) events.publish("token", { cursor });
+  };
 
   const config = new ConfigStore(join(stateDir, "config.json"));
 
@@ -545,6 +559,12 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
     });
   }
 
+  if (manifest.hasTokenStats) {
+    app.get("/clauth/v1/tokens", (c) => {
+      return c.json(tokenStats.read(c.req.query("since")));
+    });
+  }
+
   function configValues(): Record<string, unknown> {
     return { ...defaultSettings(manifest.settings, "proxy"), ...config.read() };
   }
@@ -556,6 +576,8 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
   // ---- inference ----
 
   async function forward(c: { req: { header(name: string): string | undefined; raw: Request } }, route: "messages" | "count_tokens") {
+    const startedAt = Date.now();
+    const startedMono = performance.now();
     const apiKey = c.req.header("x-api-key");
     const auth = c.req.header("authorization");
     const bearer = auth !== undefined && auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : null;
@@ -589,7 +611,11 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
         route,
         config: configValues(),
       });
-      return await normalizeInferenceResponse(res);
+      const normalized = await normalizeInferenceResponse(res);
+      if (manifest.hasTokenStats && route === "messages" && normalized.status >= 200 && normalized.status < 300) {
+        return tapTokenStats(normalized, { startedAt, startedMono, account: account.id, push: pushToken });
+      }
+      return normalized;
     } catch (err) {
       if (err instanceof AdapterError) {
         if (err.reason === "login_required") {
@@ -647,6 +673,9 @@ export function buildServer(deps: BuildServerDeps): BuiltServer {
         return controlError(405, "method_not_allowed");
       }
       if (!manifest.hasEvents && path === "/clauth/v1/events") {
+        return controlError(501, "unsupported");
+      }
+      if (!manifest.hasTokenStats && path === "/clauth/v1/tokens") {
         return controlError(501, "unsupported");
       }
       return controlError(404, "not_found");
