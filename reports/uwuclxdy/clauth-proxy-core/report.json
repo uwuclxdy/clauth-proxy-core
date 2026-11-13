@@ -1,7 +1,7 @@
 {
   "repository": "uwuclxdy/clauth-proxy-core",
   "ref": "refs/heads/mommy",
-  "commit": "85107ca4f0e390959183efea67e4a73bda633166",
+  "commit": "9a8c47c0df9f25f1f35215d9b6b102a95b61e13e",
   "base_ref": "refs/heads/mommy",
   "coverage": {
     "type": "loc",
@@ -7498,8 +7498,8 @@
             "type": "loc",
             "start_line": 128,
             "end_line": 128,
-            "count": 155,
-            "count_u64": 155
+            "count": 195,
+            "count_u64": 195
           },
           {
             "type": "loc",
@@ -15028,7 +15028,7 @@
   },
   "code_to_test_ratio": {
     "code": 2272,
-    "test": 3339,
+    "test": 3360,
     "code_files": [
       {
         "code": 56,
@@ -15159,9 +15159,9 @@
         "language": "TypeScript"
       },
       {
-        "code": 1732,
+        "code": 1753,
         "comment": 29,
-        "blank": 137,
+        "blank": 138,
         "path": "test/server.test.ts",
         "language": "TypeScript"
       },
@@ -15196,5 +15196,5 @@
     ]
   },
   "test_execution_time": 156000000000,
-  "timestamp": "2026-11-05T19:22:41.144609648Z"
+  "timestamp": "2026-11-13T23:47:58.541153468Z"
 }
