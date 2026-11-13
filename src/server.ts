@@ -125,7 +125,7 @@ function rebuildForwardRequest(raw: Request, bodyText: string): Request {
     if (STRIPPED_REQUEST_HEADERS.has(name.toLowerCase())) continue;
     headers.append(name, value);
   }
-  return new Request(raw.url, { method: raw.method, headers, body: bodyText });
+  return new Request(raw.url, { method: raw.method, headers, body: bodyText, signal: raw.signal });
 }
 
 /** A forwarded response rebuilt without CORS, hop-by-hop, `proxy-*` or upstream-only headers; the body stream passes through. */

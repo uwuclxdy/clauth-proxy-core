@@ -1522,6 +1522,28 @@ describe("header stripping and inference errors", () => {
     expect(req.headers.get("host")).toBeNull();
   }, 15000);
 
+  test("a rebuilt forward request keeps the caller's abort signal", async () => {
+    const s = ts();
+    const { key } = await loginNewAccount(s);
+    const ctrl = new AbortController();
+    let seen: AbortSignal | undefined;
+    s.adapter.forward = async (ctx) => {
+      seen = ctx.request.signal;
+      await new Promise((r) => setTimeout(r, 100));
+      return new Response("{}", { headers: { "content-type": "application/json" } });
+    };
+    const promise = s.app.request("/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key },
+      body: JSON.stringify({ model: "x" }),
+      signal: ctrl.signal,
+    });
+    await waitFor(() => seen !== undefined);
+    ctrl.abort();
+    await waitFor(() => seen!.aborted);
+    await promise;
+  }, 15000);
+
   test("an adapter rate_limited on forward answers 429 with retry-after", async () => {
     const s = ts();
     const { key } = await loginNewAccount(s);
